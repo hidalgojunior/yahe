@@ -1,128 +1,117 @@
 <?php 
 require_once '../includes/header.php';
 
-// TODO: Implementar paginação e filtros
-$produtos = [
-    [
-        'id' => 1,
-        'nome' => 'Camiseta Personalizada',
-        'descricao' => 'Camiseta 100% algodão para personalização',
-        'preco' => 49.90,
-        'imagem' => 'camiseta.jpg',
-        'categoria' => 'Camisetas'
-    ],
-    [
-        'id' => 2,
-        'nome' => 'Caneca Mágica',
-        'descricao' => 'Caneca que revela a imagem com líquido quente',
-        'preco' => 39.90,
-        'imagem' => 'caneca.jpg',
-        'categoria' => 'Canecas'
-    ],
-    // Mais produtos serão carregados do banco posteriormente
-];
+// Paginação
+$page = isset($_GET['page']) ? (int)$_GET['page'] : 1;
+$per_page = 12;
+$offset = ($page - 1) * $per_page;
+
+// Filtros
+$categoria_id = isset($_GET['categoria']) ? (int)$_GET['categoria'] : null;
+$busca = isset($_GET['busca']) ? filter_var($_GET['busca'], FILTER_SANITIZE_STRING) : null;
+
+// Monta a query
+$where = ["p.ativo = 1"];
+$params = [];
+
+if ($categoria_id) {
+    $where[] = "p.categoria_id = ?";
+    $params[] = $categoria_id;
+}
+
+if ($busca) {
+    $where[] = "(p.nome LIKE ? OR p.descricao LIKE ?)";
+    $params[] = "%$busca%";
+    $params[] = "%$busca%";
+}
+
+$where = implode(" AND ", $where);
+
+// Conta total de produtos
+$stmt = $pdo->prepare("SELECT COUNT(*) FROM produtos p WHERE $where");
+$stmt->execute($params);
+$total = $stmt->fetchColumn();
+
+// Busca produtos
+$sql = "
+    SELECT p.*, c.nome as categoria_nome 
+    FROM produtos p 
+    JOIN categorias c ON c.id = p.categoria_id 
+    WHERE $where 
+    ORDER BY p.created_at DESC 
+    LIMIT $per_page OFFSET $offset
+";
+
+$stmt = $pdo->prepare($sql);
+$stmt->execute($params);
+$produtos = $stmt->fetchAll();
+
+// Calcula total de páginas
+$total_pages = ceil($total / $per_page);
 ?>
 
-<div class="ui container">
-    <!-- Breadcrumb -->
-    <div class="ui breadcrumb">
-        <a href="/" class="section">Início</a>
-        <i class="right angle icon divider"></i>
-        <div class="active section">Produtos</div>
-    </div>
-
-    <div class="ui grid">
-        <!-- Filtros -->
-        <div class="four wide column">
-            <div class="ui vertical menu">
-                <div class="item">
-                    <div class="header">Categorias</div>
-                    <div class="menu">
-                        <a class="item">Camisetas</a>
-                        <a class="item">Canecas</a>
-                        <a class="item">Quadros</a>
-                        <a class="item">Acessórios</a>
-                    </div>
-                </div>
-                <div class="item">
-                    <div class="header">Preço</div>
-                    <div class="ui form">
-                        <div class="field">
-                            <div class="ui range slider" id="priceRange"></div>
-                            <div class="ui input">
-                                <input type="text" id="priceLabel" readonly>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-                <div class="item">
-                    <div class="header">Ordenar por</div>
-                    <select class="ui dropdown">
-                        <option value="">Selecione</option>
-                        <option value="preco_asc">Menor Preço</option>
-                        <option value="preco_desc">Maior Preço</option>
-                        <option value="nome_asc">A-Z</option>
-                        <option value="nome_desc">Z-A</option>
-                    </select>
+<div class="ui grid">
+    <!-- Filtros -->
+    <div class="four wide column">
+        <div class="ui vertical menu">
+            <div class="item">
+                <div class="header">Categorias</div>
+                <div class="menu">
+                    <?php
+                    $cats = $pdo->query("SELECT * FROM categorias ORDER BY nome");
+                    while ($cat = $cats->fetch()) {
+                        $active = $categoria_id == $cat['id'] ? 'active' : '';
+                        echo "<a class='item $active' href='?categoria={$cat['id']}'>{$cat['nome']}</a>";
+                    }
+                    ?>
                 </div>
             </div>
         </div>
-
-        <!-- Lista de Produtos -->
-        <div class="twelve wide column">
-            <h1 class="ui header">Nossos Produtos</h1>
-            
-            <!-- Barra de Busca -->
-            <div class="ui fluid action input">
-                <input type="text" placeholder="Buscar produtos...">
-                <button class="ui button">Buscar</button>
+    </div>
+    
+    <!-- Lista de Produtos -->
+    <div class="twelve wide column">
+        <!-- Busca -->
+        <form class="ui form" method="GET">
+            <div class="field">
+                <div class="ui icon input">
+                    <input type="text" name="busca" placeholder="Buscar produtos..." value="<?php echo $busca; ?>">
+                    <i class="search icon"></i>
+                </div>
             </div>
-
-            <div class="ui divider"></div>
-
-            <!-- Grid de Produtos -->
-            <div class="ui four cards">
-                <?php foreach ($produtos as $produto): ?>
+        </form>
+        
+        <!-- Grid de Produtos -->
+        <div class="ui four cards">
+            <?php foreach ($produtos as $produto): ?>
                 <div class="card">
                     <div class="image">
-                        <img src="/yahe/assets/images/products/<?php echo $produto['imagem']; ?>">
+                        <img src="<?php echo $produto['imagem'] ?: '/assets/images/produto-sem-foto.jpg'; ?>">
                     </div>
                     <div class="content">
                         <div class="header"><?php echo $produto['nome']; ?></div>
                         <div class="meta">
-                            <span class="category"><?php echo $produto['categoria']; ?></span>
+                            <span class="category"><?php echo $produto['categoria_nome']; ?></span>
                         </div>
                         <div class="description">
-                            <?php echo $produto['descricao']; ?>
-                        </div>
-                    </div>
-                    <div class="extra content">
-                        <span class="right floated">
                             R$ <?php echo number_format($produto['preco'], 2, ',', '.'); ?>
-                        </span>
-                    </div>
-                    <div class="ui two bottom attached buttons">
-                        <a href="/yahe/produtos/personalizar.php?id=<?php echo $produto['id']; ?>" class="ui primary button">
-                            Personalizar
-                        </a>
-                        <div class="ui button" onclick="addToCart(<?php echo $produto['id']; ?>)">
-                            <i class="cart icon"></i>
                         </div>
                     </div>
+                    <a class="ui bottom attached button" href="/produto/<?php echo $produto['slug']; ?>">
+                        <i class="eye icon"></i>
+                        Ver Produto
+                    </a>
                 </div>
-                <?php endforeach; ?>
-            </div>
-
-            <!-- Paginação -->
-            <div class="ui center aligned container" style="margin-top: 2em;">
-                <div class="ui pagination menu">
-                    <a class="active item">1</a>
-                    <a class="item">2</a>
-                    <a class="item">3</a>
-                    <div class="disabled item">...</div>
-                    <a class="item">10</a>
-                </div>
-            </div>
+            <?php endforeach; ?>
         </div>
+        
+        <!-- Paginação -->
+        <?php if ($total_pages > 1): ?>
+            <div class="ui pagination menu">
+                <?php for ($i = 1; $i <= $total_pages; $i++): ?>
+                    <a class="item" href="?page=<?php echo $i; ?>"><?php echo $i; ?></a>
+                <?php endfor; ?>
+            </div>
+        <?php endif; ?>
     </div>
 </div> 

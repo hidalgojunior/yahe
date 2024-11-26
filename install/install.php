@@ -3,6 +3,7 @@ session_start();
 require_once '../config/database.php';
 require_once 'version.php';
 require_once 'functions.php';
+require_once 'classes/Database.php';
 
 // Funções auxiliares de mensagens
 function showError($message) {
