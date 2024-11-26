@@ -240,6 +240,12 @@ function performInstallation($conn, $versionControl) {
     }
 
     try {
+        // Verifica se há uma transação ativa e faz rollback se necessário
+        if ($conn->inTransaction()) {
+            $conn->rollBack();
+        }
+        
+        // Inicia a transação
         $conn->beginTransaction();
         
         // Executa as migrações
@@ -269,12 +275,24 @@ function performInstallation($conn, $versionControl) {
             createAdminUser($conn);
         }
         
-        $conn->commit();
+        // Commit da transação
+        if ($conn->inTransaction()) {
+            $conn->commit();
+        }
         
-        showSuccess("Instalação da versão $targetVersion concluída com sucesso!");
+        // Cria arquivo de configuração para indicar que a instalação foi concluída
+        $installFile = dirname(__DIR__) . '/config/installed.php';
+        file_put_contents($installFile, "<?php\ndefine('YAHE_INSTALLED', true);\ndefine('YAHE_VERSION', '{$targetVersion}');");
+        
+        // Redireciona para a página inicial
+        header("Location: ../index.php?installed=true");
+        exit;
         
     } catch (Exception $e) {
-        $conn->rollBack();
+        // Faz rollback apenas se houver uma transação ativa
+        if ($conn->inTransaction()) {
+            $conn->rollBack();
+        }
         showError("Erro durante a instalação: " . $e->getMessage());
     }
 }

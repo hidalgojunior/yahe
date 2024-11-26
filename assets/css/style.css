@@ -1,0 +1,43 @@
+/* Ajustes gerais */
+body {
+    background-color: #f8f9fa;
+}
+
+/* Ajuste do container principal */
+.main.container {
+    min-height: calc(100vh - 300px); /* Garante espaço para o footer */
+}
+
+/* Estilização do menu */
+.ui.large.menu {
+    border-radius: 0;
+    border: none;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+}
+
+.ui.menu .logo {
+    max-height: 35px;
+    margin-right: 1em;
+}
+
+/* Footer */
+.footer.segment {
+    padding: 5em 0;
+    margin-top: 3em;
+}
+
+/* Responsividade */
+@media only screen and (max-width: 767px) {
+    .ui.fixed.menu {
+        display: none !important;
+    }
+    
+    .main.container {
+        margin-top: 2em;
+    }
+    
+    .ui.container {
+        margin-left: 1em !important;
+        margin-right: 1em !important;
+    }
+} 
